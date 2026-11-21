@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPO Trade Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg1:#0b1f3a; --bg2:#06111f; --panel:#0d1726; --ink:#f3f3f3; --muted:#9fb0c6;
+  --slot:#3a3a3a; --slot-h:#4a4a4a; --line:#e9e9e9;
+  --win:#3ddc4a; --lose:#e5322d; --eq:#f2c230; --accent:#ff7a1a;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--ink);font-family:Fredoka,system-ui,sans-serif;
+  background:radial-gradient(ellipse at 50% 20%,#15345f 0%,var(--bg1) 45%,var(--bg2) 100%);background-color:var(--bg2)}
+header{text-align:center;padding:18px 16px 6px}
+header h1{margin:0;font-family:"Permanent Marker",cursive;font-size:clamp(26px,5vw,40px);letter-spacing:1px;text-shadow:0 3px 0 #000}
+header p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.trade{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;max-width:1000px;margin:18px auto;padding:0 16px;align-items:start}
+.side{background:rgba(5,12,22,.75);border:2px solid #263a55;border-radius:6px;padding:12px 14px 14px}
+.side-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+.side-head input{background:transparent;border:none;border-bottom:1px dashed #456;color:var(--ink);font:600 18px Fredoka,system-ui,sans-serif;width:60%;outline:none}
+.verdict{font-family:"Permanent Marker",cursive;font-size:20px;letter-spacing:1px;min-width:80px;white-space:nowrap;text-align:right;color:var(--muted)}
+.verdict.win{color:var(--win)} .verdict.lose{color:var(--lose)} .verdict.eq{color:var(--eq)}
+/* sketchy frame */
+.frame{position:relative;padding:16px;border:3px solid var(--line);border-radius:4px 10px 5px 12px/12px 4px 10px 5px;
+  box-shadow:3px 3px 0 rgba(255,255,255,.18) inset, 0 0 0 1px rgba(255,255,255,.15)}
+.frame::after{content:"";position:absolute;inset:4px;border:2px solid rgba(255,255,255,.5);border-radius:10px 4px 12px 5px/5px 12px 4px 10px;pointer-events:none}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.slot{aspect-ratio:1;background:var(--slot);border:3px solid var(--line);border-radius:6px 3px 7px 4px/4px 7px 3px 6px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;padding:0;color:var(--ink);transition:transform .08s,background .15s}
+.slot:hover{background:var(--slot-h);transform:rotate(-1deg) scale(1.03)}
+.slot .plus{font:700 54px/1 Fredoka,system-ui,sans-serif;color:#fff;text-shadow:0 2px 0 #000}
+.slot img{width:78%;height:78%;object-fit:contain;filter:drop-shadow(0 3px 2px rgba(0,0,0,.6))}
+.slot .noimg{font-size:12px;padding:6px;text-align:center}
+.slot .val{position:absolute;bottom:3px;left:0;right:0;text-align:center;font:600 12px Fredoka,system-ui,sans-serif;text-shadow:0 1px 2px #000}
+.slot .x{position:absolute;top:2px;right:5px;font-size:15px;opacity:0;color:#ff6b6b;font-weight:700}
+.slot.filled:hover .x{opacity:1}
+.slot.r-collectable{background:linear-gradient(160deg,#5b2b7a,#2a1438)}
+.slot.r-mythical{background:linear-gradient(160deg,#7a2b2b,#381414)}
+.slot.r-legendary{background:linear-gradient(160deg,#7a5b1a,#382a0c)}
+.slot.r-epic{background:linear-gradient(160deg,#4b2b7a,#201438)}
+.slot.r-rare{background:linear-gradient(160deg,#1f4f7a,#0e2438)}
+.slot.r-common{background:linear-gradient(160deg,#4a4a4a,#2a2a2a)}
+.total{margin-top:10px;display:flex;justify-content:space-between;font-size:15px;color:var(--muted)}
+.total b{color:var(--ink);font-size:18px}
+.mid{display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:120px;min-width:110px}
+.mid .diff{font:600 14px Fredoka,system-ui,sans-serif;color:var(--muted);text-align:center}
+.mid .diff b{display:block;font-size:20px;color:var(--ink)}
+.arrows{font-size:36px}
+.btn{font:700 15px Fredoka,system-ui,sans-serif;border:2px solid #000;border-radius:6px;padding:8px 18px;cursor:pointer;color:#fff;box-shadow:0 3px 0 #000}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #000}
+.btn.clear{background:#b8231f}
+.btn.swap{background:#2b7bd0}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:8px 16px 24px}
+footer a{color:var(--muted)}
+/* picker */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:10;padding:16px}
+.modal.open{display:flex}
+.picker{background:#0d1a2b;border:3px solid var(--line);border-radius:8px;width:min(860px,100%);max-height:88vh;display:flex;flex-direction:column}
+.picker-top{padding:12px 14px;border-bottom:2px solid #263a55;display:flex;flex-direction:column;gap:10px}
+.picker-row{display:flex;gap:10px;align-items:center}
+.picker-row input{flex:1;background:#06111f;border:2px solid #36506f;border-radius:6px;color:var(--ink);font:500 16px Fredoka,system-ui,sans-serif;padding:8px 10px;outline:none}
+.picker-row input:focus{border-color:var(--accent)}
+.close{background:none;border:none;color:#fff;font-size:28px;cursor:pointer;line-height:1}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:#14263d;border:1px solid #36506f;color:var(--ink);border-radius:20px;padding:4px 11px;font:500 13px Fredoka,system-ui,sans-serif;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#111}
+.items{overflow:auto;padding:12px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
+.item{background:#14263d;border:2px solid #263a55;border-radius:8px;padding:8px 6px;cursor:pointer;text-align:center;color:var(--ink);font-family:Fredoka,system-ui,sans-serif}
+.item:hover{border-color:var(--accent);transform:translateY(-2px)}
+.item .pic{height:64px;display:flex;align-items:center;justify-content:center}
+.item img{max-width:64px;max-height:64px}
+.item .nm{font-size:12.5px;line-height:1.15;margin-top:5px;min-height:29px}
+.item .pv{font-weight:700;font-size:14px;color:#ffd166;margin-top:3px}
+.item .rr{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px}
+.rt-collectable{color:#d18cff}.rt-mythical{color:#ff6b6b}.rt-legendary{color:#ffc14d}.rt-epic{color:#a98bff}.rt-rare{color:#5fb4ff}.rt-common{color:#bbb}
+.pq{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:14px;white-space:nowrap}
+.pq input{width:70px;flex:none}
+input[type=number]{background:#06111f;border:2px solid #36506f;border-radius:6px;color:var(--ink);font:600 16px Fredoka,system-ui,sans-serif;padding:7px 8px;outline:none;text-align:center}
+input[type=number]:focus{border-color:var(--accent)}
+.slot .qty{position:absolute;top:3px;left:5px;font:700 14px Fredoka,system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.65);border-radius:5px;padding:0 5px;line-height:18px}
+.qbox{background:#0d1a2b;border:3px solid var(--line);border-radius:8px;width:min(380px,100%);padding:16px;display:flex;flex-direction:column;gap:14px}
+.qhead{display:flex;gap:12px;align-items:center}
+.qpic{width:64px;height:64px;flex:none;background:var(--slot);border:2px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.qpic img{max-width:52px;max-height:52px}
+.qname{font-weight:700;font-size:17px}.qeach{color:var(--muted);font-size:13px}
+.qrow{display:flex;gap:6px;justify-content:center;align-items:center}
+.qrow input{width:90px;font-size:20px}
+.qb{background:#14263d;border:2px solid #36506f;color:var(--ink);border-radius:6px;font:700 16px Fredoka,system-ui,sans-serif;min-width:42px;height:40px;cursor:pointer}
+.qb:hover{border-color:var(--accent)}
+#qr{width:100%;accent-color:var(--accent)}
+.qtotal{text-align:center;color:var(--muted)}.qtotal b{color:#ffd166;font-size:20px}
+.qact{display:flex;justify-content:space-between}
+.btn.ok{background:#2f9e3a}
+.empty{color:var(--muted);padding:20px;grid-column:1/-1;text-align:center}
+@media (max-width:760px){
+  .trade{grid-template-columns:1fr;gap:12px}
+  .mid{padding-top:0;flex-direction:row;justify-content:center;flex-wrap:wrap}
+  .arrows{transform:rotate(90deg)}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>TRADE CHECKER</h1>
+  <p>Жми на плюсики, добавляй предметы — увидишь кто в плюсе</p>
+</header>
+
+<main class="trade">
+  <section class="side" data-side="0">
+    <div class="side-head"><input value="Ты" maxlength="20" aria-label="Имя"><span class="verdict">—</span></div>
+    <div class="frame"><div class="grid"></div></div>
+    <div class="total"><span>Отдаёт:</span><b class="sum">0</b></div>
+  </section>
+
+  <div class="mid">
+    <div class="arrows">⇄</div>
+    <div class="diff">Разница<b id="diff">0</b></div>
+    <button class="btn swap" id="swap">Поменять</button>
+    <button class="btn clear" id="clear">Очистить</button>
+  </div>
+
+  <section class="side" data-side="1">
+    <div class="side-head"><input value="Он" maxlength="20" aria-label="Имя"><span class="verdict">—</span></div>
+    <div class="frame"><div class="grid"></div></div>
+    <div class="total"><span>Отдаёт:</span><b class="sum">0</b></div>
+  </section>
+</main>
+
+<footer>Цены, названия и картинки: <a href="https://gpovalues.com/browse/" target="_blank" rel="noopener">gpovalues.com</a> · обновлено <span id="upd"></span></footer>
+
+<div class="modal" id="modal">
+  <div class="picker" role="dialog" aria-label="Выбор предмета">
+    <div class="picker-top">
+      <div class="picker-row"><input id="q" placeholder="Поиск: название или код (PCHAK)…" autocomplete="off">
+        <label class="pq">Кол-во <input id="pq" type="number" min="1" max="300" value="1"></label>
+        <button class="close" id="close" aria-label="Закрыть">×</button></div>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="items" id="items"></div>
+  </div>
+</div>
+
+<div class="modal" id="qmodal">
+  <div class="qbox" role="dialog" aria-label="Количество">
+    <div class="qhead"><div class="qpic" id="qpic"></div><div><div class="qname" id="qname"></div><div class="qeach" id="qeach"></div></div></div>
+    <div class="qrow">
+      <button class="qb" data-d="-10">−10</button><button class="qb" data-d="-1">−</button>
+      <input id="qn" type="number" min="1" max="300" value="1" aria-label="Количество">
+      <button class="qb" data-d="1">+</button><button class="qb" data-d="10">+10</button>
+    </div>
+    <input id="qr" type="range" min="1" max="300" value="1" aria-label="Количество">
+    <div class="qtotal">Всего: <b id="qtot">0</b></div>
+    <div class="qact"><button class="btn clear" id="qdel">Убрать</button><button class="btn ok" id="qok">Готово</button></div>
+  </div>
+</div>
+
+<script src="items.js"></script>
+<script>
+const SLOTS = 9;
+const TYPES = [["","Все"],["fruits","Фрукты"],["swords","Мечи"],["guns","Пушки"],["accessories","Аксессуары"],["outfits","Одежда/Ауры"],["ase","All Seeing Eye"],["chests","Сундуки"],["fishing","Рыбалка"],["misc","Разное"]];
+const RU_R = {collectable:"Collectable",mythical:"Mythical",legendary:"Legendary",epic:"Epic",rare:"Rare",common:"Common"};
+let bySlug = Object.fromEntries(ITEMS.map(i=>[i.slug,i]));
+let trade = [Array(SLOTS).fill(null), Array(SLOTS).fill(null)];
+let target = null, typeFilter = "";
+
+const MAXQ = 300;
+const clampQ = n => Math.min(MAXQ, Math.max(1, Math.round(Number(n)) || 1));
+// слот: null или {s: slug, q: количество}
+const normSlot = x => { if(typeof x==="string") x={s:x,q:1}; return x && bySlug[x.s] ? {s:x.s,q:clampQ(x.q)} : null; };
+try{ const s = JSON.parse(localStorage.getItem("gpo-trade")||"null");
+  if(s && s.length===2) trade = s.map(a=>Array.from({length:SLOTS},(_,k)=>normSlot(a[k]))); }catch(e){}
+
+const fmt = v => v>=1e6 ? (v/1e6).toFixed(v>=1e7?1:2).replace(/\.?0+$/,"")+"M"
+              : v>=1e4 ? (v/1e3).toFixed(1).replace(/\.0$/,"")+"K"
+              : v.toLocaleString("ru-RU");
+const esc = s => s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sides = [...document.querySelectorAll(".side")];
+
+function render(){
+  const sums = trade.map(t=>t.reduce((a,x)=>a+(x?bySlug[x.s].value*x.q:0),0));
+  sides.forEach((el,i)=>{
+    const g = el.querySelector(".grid"); g.innerHTML = "";
+    trade[i].forEach((x,k)=>{
+      const b = document.createElement("button"); b.className="slot";
+      if(x){ const it = bySlug[x.s]; b.classList.add("filled","r-"+it.rarity);
+        b.title = `${it.name} ×${x.q} — ${(it.value*x.q).toLocaleString("ru-RU")} (клик — изменить количество)`;
+        b.innerHTML = (it.img?`<img src="${it.img}" alt="${esc(it.name)}">`:`<span class="noimg">${esc(it.name)}</span>`)
+          +(x.q>1?`<span class="qty">x${x.q}</span>`:"")+`<span class="val">${fmt(it.value*x.q)}</span>`;
+        b.onclick = ()=>openQty(i,k);
+      } else { b.innerHTML = `<span class="plus">+</span>`; b.title="Добавить предмет"; b.onclick = ()=>openPicker(i,k); }
+      g.appendChild(b);
+    });
+    el.querySelector(".sum").textContent = sums[i].toLocaleString("ru-RU");
+  });
+  const v = sides.map(el=>el.querySelector(".verdict"));
+  const any = trade.some(t=>t.some(Boolean));
+  v.forEach(x=>x.className="verdict");
+  if(!any){ v.forEach(x=>x.textContent="—"); }
+  else if(sums[0]===sums[1]){ v.forEach(x=>{x.textContent="EQUAL";x.classList.add("eq")}); }
+  else { // каждый отдаёт свои предметы и получает чужие: в плюсе тот, кто отдал меньше, чем получил
+    const w = sums[0]<sums[1]?0:1, gain = fmt(Math.abs(sums[0]-sums[1]));
+    v[w].textContent="W +"+gain; v[w].classList.add("win"); v[1-w].textContent="LOSE −"+gain; v[1-w].classList.add("lose"); }
+  const d = Math.abs(sums[0]-sums[1]);
+  document.getElementById("diff").textContent = d.toLocaleString("ru-RU");
+}
+function save(){ try{ localStorage.setItem("gpo-trade", JSON.stringify(trade)); }catch(e){} }
+
+const modal = document.getElementById("modal"), q = document.getElementById("q");
+const pq = document.getElementById("pq");
+pq.onchange = ()=>{ pq.value = clampQ(pq.value); };
+function openPicker(i,k){ target=[i,k]; q.value=""; pq.value=1; modal.classList.add("open"); renderItems(); setTimeout(()=>q.focus(),30); }
+function closePicker(){ modal.classList.remove("open"); target=null; }
+function renderItems(){
+  const s = q.value.trim().toLowerCase();
+  const list = ITEMS.filter(it=>(!typeFilter||it.type===typeFilter) && (!s||it.name.toLowerCase().includes(s)||it.code.toLowerCase().includes(s)))
+                    .sort((a,b)=>b.value-a.value);
+  const box = document.getElementById("items");
+  box.innerHTML = list.length ? "" : `<div class="empty">Ничего не найдено</div>`;
+  for(const it of list){
+    const d = document.createElement("button"); d.className="item";
+    d.innerHTML = `<div class="pic">${it.img?`<img src="${it.img}" alt="" loading="lazy">`:"❔"}</div><div class="nm">${esc(it.name)}</div><div class="rr rt-${it.rarity}">${RU_R[it.rarity]||it.rarity}</div><div class="pv">${it.value.toLocaleString("ru-RU")}</div>`;
+    d.onclick = ()=>{ const [i,k]=target; trade[i][k]={s:it.slug,q:clampQ(pq.value)}; save(); closePicker(); render(); };
+    box.appendChild(d);
+  }
+}
+const chips = document.getElementById("chips");
+TYPES.forEach(([t,l])=>{ const c=document.createElement("button"); c.className="chip"+(t===""?" on":""); c.textContent=l;
+  c.onclick=()=>{ typeFilter=t; chips.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c)); renderItems(); }; chips.appendChild(c); });
+q.oninput = renderItems;
+q.onkeydown = e=>{ if(e.key==="Enter"){ const f=document.querySelector("#items .item"); if(f) f.click(); } };
+document.getElementById("close").onclick = closePicker;
+modal.onclick = e=>{ if(e.target===modal) closePicker(); };
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closePicker(); closeQty(); } });
+
+// окно количества для заполненного слота
+const qmodal = document.getElementById("qmodal"), qn = document.getElementById("qn"), qr = document.getElementById("qr");
+let qtarget = null;
+function setQ(n){ const v = clampQ(n); qn.value = v; qr.value = v;
+  const [i,k] = qtarget, x = trade[i][k]; x.q = v;
+  document.getElementById("qtot").textContent = (bySlug[x.s].value*v).toLocaleString("ru-RU");
+  save(); render(); }
+function openQty(i,k){ qtarget=[i,k]; const x = trade[i][k], it = bySlug[x.s];
+  document.getElementById("qpic").innerHTML = it.img?`<img src="${it.img}" alt="">`:"❔";
+  document.getElementById("qname").textContent = it.name;
+  document.getElementById("qeach").textContent = "1 шт = " + it.value.toLocaleString("ru-RU");
+  qmodal.classList.add("open"); setQ(x.q); setTimeout(()=>{ qn.focus(); qn.select(); },30); }
+function closeQty(){ qmodal.classList.remove("open"); qtarget=null; }
+qmodal.querySelectorAll(".qb").forEach(b=>b.onclick=()=>setQ(Number(qn.value)+Number(b.dataset.d)));
+qn.oninput = ()=>{ if(qn.value!=="") setQ(qn.value); };
+qn.onchange = ()=>setQ(qn.value);
+qn.onkeydown = e=>{ if(e.key==="Enter") closeQty(); };
+qr.oninput = ()=>setQ(qr.value);
+document.getElementById("qok").onclick = closeQty;
+document.getElementById("qdel").onclick = ()=>{ const [i,k]=qtarget; trade[i][k]=null; save(); closeQty(); render(); };
+qmodal.onclick = e=>{ if(e.target===qmodal) closeQty(); };
+document.getElementById("clear").onclick = ()=>{ trade=[Array(SLOTS).fill(null),Array(SLOTS).fill(null)]; save(); render(); };
+document.getElementById("swap").onclick = ()=>{ trade=[trade[1],trade[0]];
+  const n=sides.map(s=>s.querySelector("input")); [n[0].value,n[1].value]=[n[1].value,n[0].value]; save(); render(); };
+document.getElementById("upd").textContent = UPDATED;
+render();
+
+// раз в 5 минут перечитываем items.js — если update.ps1 обновил цены, они подтянутся без перезагрузки
+setInterval(()=>{
+  const s = document.createElement("script");
+  s.src = "items.js?t=" + Date.now();
+  s.onload = ()=>{ s.remove();
+    bySlug = Object.fromEntries(ITEMS.map(i=>[i.slug,i]));
+    trade = trade.map(t=>t.map(normSlot));
+    if(qtarget && !trade[qtarget[0]][qtarget[1]]) closeQty();
+    document.getElementById("upd").textContent = UPDATED;
+    render(); if(modal.classList.contains("open")) renderItems(); };
+  s.onerror = ()=>s.remove();
+  document.body.appendChild(s);
+}, 5*60*1000);
+</script>
+</body>
+</html>

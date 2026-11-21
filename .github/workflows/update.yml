@@ -1,0 +1,58 @@
+name: Update prices and deploy
+
+on:
+  schedule:
+    - cron: "17 * * * *"   # каждый час
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Update prices from gpovalues.com
+        run: python update.py
+        continue-on-error: true   # если gpovalues недоступен — выкладываем старые цены
+
+      - name: Commit new prices
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add items.js images
+          if git diff --cached --quiet; then
+            echo "Цены не изменились"
+          else
+            git commit -m "Обновление цен $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
+
+      - name: Prepare site
+        run: |
+          mkdir _site
+          cp -r index.html items.js images _site/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4
